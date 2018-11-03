@@ -70,5 +70,80 @@ class CommentTest extends \Tests\TestCase{
         $this->assertEquals(0, Comment::count());
     }
 
+    public function testWithFakeEmail()
+    {
+        $post = factory(Post::class)->create();
+        $comment = factory(Comment::class)->make(['comment_id' => $post->id, 'comment_type' => 'Post', 'email' => 'gjackson@']);
+        $response = $this->call('POST', '/api/comments', $comment->getAttributes());
+
+        $json = json_decode($response->getContent());
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertEquals(0, Comment::count());
+        $this->assertObjectNotHasAttribute('email', $json);
+    }
+    public function testPostCommentWithFalseReply()
+    {
+        $post = factory(Post::class)->create();
+        $comment = factory(Comment::class)->make(['comment_id' => $post->id, 'comment_type' => 'Post', 'reply' => 4]);
+        $response = $this->call('POST', '/api/comments', $comment->getAttributes());
+
+        $json = json_decode($response->getContent());
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertEquals(0, Comment::count());
+        $this->assertObjectNotHasAttribute('reply', $json);
+    }
+
+    public function testReplyOnReply()
+    {
+        $post = factory(Post::class)->create();
+        $comment = factory(Comment::class)->create(['comment_id' => $post->id, 'comment_type' => 'Post']);
+        $reply = factory(Comment::class)->create(['comment_id' => $post->id, 'comment_type' => 'Post', 'reply' => $comment->id]);
+        $reply2 = factory(Comment::class)->make(['comment_id' => $post->id, 'comment_type' => 'Post', 'reply' => $reply->id]);
+
+        $response = $this->call('POST', '/api/comments', $reply2->getAttributes());
+
+        $json = json_decode($response->getContent());
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertEquals(2, Comment::count());
+        $this->assertObjectNotHasAttribute('reply', $json);
+    }
+
+    public function testDeleteComment()
+    {
+        $post = factory(Post::class)->create();
+        $ip = Request::ip();
+        $comment = factory(Comment::class)->create(['comment_id' => $post->id, 'comment_type' => 'Post', 'ip' => $ip]);
+        $response = $this->call('DELETE', '/api/comments/' . $comment->id);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals(0, Comment::count());
+    }
+
+    public function testDeleteCommentWithoutIp()
+    {
+        $post = factory(Post::class)->create();
+        $ip = Request::ip();
+        $comment = factory(Comment::class)->create(['comment_id' => $post->id, 'comment_type' => 'Post']);
+        $response = $this->call('DELETE', '/api/comments/' . $comment->id);
+
+        $this->assertEquals(403, $response->getStatusCode());
+        $this->assertEquals(1, Comment::count());
+    }
+
+    public function testDeleteOnCascade()
+    {
+        $post = factory(Post::class)->create();
+        $ip = Request::ip();
+        $comment = factory(Comment::class)->create(['comment_id' => $post->id, 'comment_type' => 'Post', 'ip' => $ip]);
+        $reply = factory(Comment::class)->create(['comment_id' => $post->id, 'comment_type' => 'Post', 'reply' => $comment->id]);
+
+        $response = $this->call('DELETE', '/api/comments/' . $comment->id);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals(0, Comment::count());
+    }
 
 }

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Comment extends Model
 {
     //
+    protected static $commentAbleFor = ['Post'];
     protected $guarded = [];
     protected $hidden = ['email', 'ip'];
     protected $appends = ['email_md5', 'ip_md5'];
@@ -39,5 +40,18 @@ class Comment extends Model
             }
         }
         return  array_reverse($comments);
+    }
+
+    public static function isCommentAble($model, $model_id)
+    {
+        if(!in_array($model, self::$commentAbleFor))
+        {
+            return false;
+        }
+        else
+        {
+            $model = "\\App\\$model";
+            return $model::where(['id' => $model_id])->exists();
+        }
     }
 }
